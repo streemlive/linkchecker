@@ -3,40 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Kipas Link Checker</title>
+    <title>FF Kipas Link Checker PRO</title>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: white; padding: 20px; }
-        .container { max-width: 900px; margin: auto; }
-        button { padding: 12px 24px; background: #22c55e; border: none; cursor: pointer; font-weight: bold; color: white; border-radius: 5px; margin-bottom: 10px; }
-        button:disabled { background: #334155; cursor: not-allowed; }
-        table { width: 100%; margin-top: 20px; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
-        td, th { padding: 12px; border-bottom: 1px solid #334155; text-align: left; font-size: 14px; }
-        th { background: #334155; color: #94a3b8; text-transform: uppercase; font-size: 12px; }
-        .ok { color: #4ade80; font-weight: bold; }
-        .bad { color: #f87171; font-weight: bold; }
-        .download-btn { padding: 5px 10px; background: #3b82f6; border: none; color: white; cursor: pointer; border-radius: 3px; text-decoration: none; font-size: 12px; }
-        #progressContainer { width: 100%; background: #334155; border-radius: 50px; margin: 20px 0; height: 12px; overflow: hidden; }
-        #progressBar { height: 100%; width: 0; background: #22c55e; transition: width 0.3s; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #0b0f1a; color: #e2e8f0; padding: 20px; line-height: 1.5; }
+        .container { max-width: 800px; margin: auto; }
+        h2 { color: #38bdf8; border-bottom: 2px solid #1e293b; padding-bottom: 10px; }
+        .controls { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; }
+        button { background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #059669; }
+        button:disabled { background: #334155; opacity: 0.6; }
+        .progress-bar { height: 8px; background: #334155; border-radius: 10px; margin: 15px 0; overflow: hidden; width: 100%; }
+        #progressFill { height: 100%; width: 0%; background: #38bdf8; transition: width 0.4s ease; }
+        table { width: 100%; border-collapse: collapse; background: #111827; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        th { background: #1f2937; padding: 12px; text-align: left; font-size: 12px; color: #94a3b8; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid #1f2937; font-size: 14px; }
+        .status-ok { color: #4ade80; font-weight: 600; }
+        .status-bad { color: #f87171; font-weight: 600; }
+        .status-wait { color: #94a3b8; }
+        .btn-link { color: #38bdf8; text-decoration: none; font-size: 12px; border: 1px solid #38bdf8; padding: 4px 8px; border-radius: 4px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📥 Download Link Checker</h2>
-    <p style="color: #94a3b8;">Automated status check for FF Kipas & Arceus X links.</p>
-
-    <button id="checkBtn" onclick="startChecking()">Start Checking</button>
-    <span id="statusText" style="margin-left: 15px; color: #38bdf8;">Ready</span>
-
-    <div id="progressContainer">
-        <div id="progressBar"></div>
+    <h2>📥 FF Kipas Link Checker</h2>
+    
+    <div class="controls">
+        <button id="startBtn" onclick="runCheck()">Start Analysis</button>
+        <div id="statusLabel">Ready to scan 30 links</div>
     </div>
 
-    <table id="linkTable">
+    <div class="progress-bar"><div id="progressFill"></div></div>
+
+    <table id="resultsTable">
         <thead>
             <tr>
                 <th>#</th>
-                <th>URL</th>
+                <th>Source URL</th>
                 <th>Status</th>
                 <th>Action</th>
             </tr>
@@ -46,7 +49,6 @@
 </div>
 
 <script>
-// Links extracted from your links.txt
 const urls = [
     "https://arceusx.com/v5", "https://arceusx.com/v5vng", "https://arceusx.com/arceusx",
     "https://arceusx.com/aradmin", "https://arceusx.com/arceusxvng", "https://arceusx.com/arceusx.ipa",
@@ -61,61 +63,67 @@ const urls = [
     "https://deltaexectr.com/vng.ipa"
 ];
 
-const tableBody = document.getElementById('tableBody');
-
-// Render initial table
+const tbody = document.getElementById('tableBody');
 urls.forEach((url, i) => {
-    tableBody.innerHTML += `
+    tbody.innerHTML += `
         <tr>
-            <td>${i + 1}</td>
-            <td style="word-break: break-all; max-width: 300px;">${url}</td>
-            <td id="status-${i}">⏳ Waiting</td>
-            <td><a class="download-btn" href="${url}" target="_blank">Link</a></td>
+            <td>${i+1}</td>
+            <td style="word-break: break-all; color: #94a3b8;">${url}</td>
+            <td id="s-${i}" class="status-wait">Waiting...</td>
+            <td><a href="${url}" target="_blank" class="btn-link">Open</a></td>
         </tr>
     `;
 });
 
-async function checkOne(url, index) {
-    const statusCell = document.getElementById("status-" + index);
-    statusCell.innerText = "🔄 Checking...";
+async function checkLink(url, index) {
+    const el = document.getElementById(`s-${index}`);
+    el.innerText = "Checking...";
     
-    // Switch to a more reliable proxy (Corsproxy.io)
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+    // Using AllOrigins which often bypasses 403 because it's a scripted proxy
+    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
 
     try {
-        // Use 'HEAD' request first to save bandwidth and check status
-        const res = await fetch(proxyUrl, { method: 'GET' });
-        
-        if (res.ok) {
-            statusCell.innerHTML = "✅ WORKING";
-            statusCell.className = "ok";
+        const response = await fetch(proxy);
+        const data = await response.json();
+
+        if (data.status && data.status.http_code === 200) {
+            // Check if it's a real file or just a "Forbidden" page wrapped in a 200
+            const content = data.contents || "";
+            if (content.includes("Forbidden") || content.includes("Access Denied")) {
+                el.innerText = "❌ BLOCKED (403)";
+                el.className = "status-bad";
+            } else {
+                el.innerText = "✅ WORKING";
+                el.className = "status-ok";
+            }
         } else {
-            statusCell.innerHTML = `❌ DEAD (${res.status})`;
-            statusCell.className = "bad";
+            const code = data.status ? data.status.http_code : "Error";
+            el.innerText = `❌ DEAD (${code})`;
+            el.className = "status-bad";
         }
-    } catch (err) {
-        // Final fallback if the proxy itself fails
-        statusCell.innerHTML = "⚠️ PROXY ERROR";
-        statusCell.className = "bad";
+    } catch (e) {
+        el.innerText = "⚠️ TIMEOUT";
+        el.className = "status-bad";
     }
 }
 
-async function startChecking() {
-    const btn = document.getElementById("checkBtn");
+async function runCheck() {
+    const btn = document.getElementById('startBtn');
+    const fill = document.getElementById('progressFill');
     btn.disabled = true;
-    document.getElementById("statusText").innerText = "Processing...";
 
     for (let i = 0; i < urls.length; i++) {
-        await checkOne(urls[i], i);
+        await checkLink(urls[i], i);
+        let p = ((i + 1) / urls.length) * 100;
+        fill.style.width = p + "%";
+        document.getElementById('statusLabel').innerText = `Progress: ${Math.round(p)}%`;
         
-        // Update Progress
-        let percent = Math.round(((i + 1) / urls.length) * 100);
-        document.getElementById("progressBar").style.width = percent + "%";
-        document.getElementById("statusText").innerText = `Checked ${i+1}/${urls.length}`;
+        // Add a small delay so we don't trigger rate limits
+        await new Promise(r => setTimeout(r, 600));
     }
 
-    document.getElementById("statusText").innerText = "✅ Done!";
     btn.disabled = false;
+    document.getElementById('statusLabel').innerText = "Scan Complete";
 }
 </script>
 
